@@ -49,6 +49,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "NRedisStack": {
+              "target": "Package",
+              "version": "[1.3.0, )"
+            },
             "Telegram.Bot": {
               "target": "Package",
               "version": "[22.9.5.3, )"
