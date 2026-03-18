@@ -67,7 +67,15 @@ class Program
         
         if (msg.Text != null && msg.Text.Equals("/start", StringComparison.OrdinalIgnoreCase))
         {
-            await DisplayButtons(msg.Chat.Id, ct);
+            await Bot.SendMessage(msg.Chat.Id, "бутылка", cancellationToken: ct, 
+                replyMarkup: new ReplyKeyboardMarkup(new[]
+                {
+                    new KeyboardButton[] { "Open🗝️", "Check balance" },
+                    new KeyboardButton[] { "Reset score" }
+                })
+                {
+                    ResizeKeyboard = true
+                });        
         }
         
         if (msg.Text is null || 
@@ -90,7 +98,7 @@ class Program
             return;
         }
         
-        var userId = $"user:{msg.From.Id}";
+        var userId = $"{msg.From.Username}";
 
         if (msg.Text.Equals("Reset score", StringComparison.OrdinalIgnoreCase))
         {
@@ -105,8 +113,6 @@ class Program
         }
         
         await GetSkin(msg.Chat.Id, userId);
-        await DisplayButtons(msg.Chat.Id, ct);
-
     }
 
     private static async Task GetSkin(long msgChatId, string userId)
@@ -115,7 +121,7 @@ class Program
         Skin? randomSkin = _skins[rng.Next(_skins.Count)];
         double price = (double)(Utilities.ExtractFirstPriceNumber(PriceFetcher.GetPrice($"{randomSkin.Name}").Result) / 100);
         
-        Console.WriteLine($"User received:\n " +
+        Console.WriteLine($"User {userId} received:\n " +
                           $"{randomSkin.Rarity}\n " +
                           $"{randomSkin.Name}\n" +
                           $"Quality:{randomSkin.Exterior}\n" +
@@ -130,7 +136,15 @@ class Program
                     $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" +
                     $"👉 {randomSkin.Name}\n"+
                     $"🛠 Quality:{randomSkin.Exterior}\n" +
-                    $"💵 ${price}\n\n");
+                    $"💵 ${price}\n\n",
+            replyMarkup: new ReplyKeyboardMarkup(new[]
+            {
+                new KeyboardButton[] { "Open🗝️", "Check balance" },
+                new KeyboardButton[] { "Reset score" }
+            })
+            {
+                ResizeKeyboard = true
+            });
         
         await DbAddEntry(userId, price);
     }
@@ -169,7 +183,6 @@ class Program
             ]);
         }
         await Bot.SendMessage(msgChatId, "Your stats have been reset", cancellationToken: ct);
-        await DisplayButtons(msgChatId, ct);
         Console.WriteLine($"User {userId} has been reset\n");
     }
     static async Task DbGetUserDetails(string userId, long msgChatId, CancellationToken ct)
@@ -178,31 +191,28 @@ class Program
         {
             var balance = (double)db.HashGet(userId, "balance");
             var casesOpened = (double)db.HashGet(userId, "cases_opened");
-            await Bot.SendMessage(msgChatId, $"💰Your balance is: ${balance:F2}\n📦You have opened {casesOpened} cases!", cancellationToken: ct);
+            await Bot.SendMessage(msgChatId, $"💰Your balance is: ${balance:F2}\n📦You have opened {casesOpened} cases!",
+                replyMarkup: new ReplyKeyboardMarkup(new[]
+                {
+                    new KeyboardButton[] { "Open🗝️", "Check balance" },
+                    new KeyboardButton[] { "Reset score" }
+                })
+                {
+                    ResizeKeyboard = true
+                }, cancellationToken: ct);
         }
         else
         {
-            await Bot.SendMessage(msgChatId, $"💰Your balance is: $0", cancellationToken: ct);
+            await Bot.SendMessage(msgChatId, $"💰Your balance is: $0",
+                replyMarkup: new ReplyKeyboardMarkup(new[]
+                {
+                    new KeyboardButton[] { "Open🗝️", "Check balance" },
+                    new KeyboardButton[] { "Reset score" }
+                })
+                {
+                    ResizeKeyboard = true
+                }, cancellationToken: ct);
         }
-
-        await DisplayButtons(msgChatId, ct);
         Console.WriteLine($"User {userId}'s details have been displayed\n");
-    }
-
-    static async Task DisplayButtons(long msgChatId, CancellationToken ct)
-    {
-        await Bot.SendMessage(
-            msgChatId,
-            "boogert?",
-            replyMarkup: new ReplyKeyboardMarkup(new[]
-            {
-                new KeyboardButton[] { "Open🗝️", "Check balance" },
-                new KeyboardButton[] { "Reset score" }
-            })
-            {
-                ResizeKeyboard = true
-            },
-            cancellationToken: ct
-        );
     }
 }
