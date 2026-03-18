@@ -1,4 +1,5 @@
-﻿using TgCaseBot.Classes;
+﻿using System.Text.RegularExpressions;
+using TgCaseBot.Classes;
 
 namespace TgCaseBot;
 using Telegram.Bot;
@@ -23,14 +24,13 @@ class Program
         .ToList();
     static async Task Main(string[] args)
     {
-        // using var cts = new CancellationTokenSource();
-        //
-        // Bot.OnMessage += OnMessage;
-        //
-        // Console.ReadLine();
-        // await cts.CancelAsync(); 
+        using var cts = new CancellationTokenSource();
+        
+        Bot.OnMessage += OnMessage;
+        
+        Console.ReadLine();
+        await cts.CancelAsync(); 
 
-        Console.WriteLine(PriceFetcher.GetPrice("Souvenir AUG | Storm (Field-Tested)").Result);
         Console.ReadLine();
     }
     static async Task OnMessage(Message msg, UpdateType type)
@@ -44,7 +44,8 @@ class Program
         Console.WriteLine($"User received:\n " +
                           $"{randomSkin.Rarity}\n " +
                           $"{randomSkin.Name}\n" +
-                          $"Quality:{randomSkin.Exterior}\n\n");
+                          $"Quality:{randomSkin.Exterior}\n" +
+                          $"Price is ${ExtractFirstPriceNumber(PriceFetcher.GetPrice($"{randomSkin.Name}").Result) / 100}\n\n");
 
         var path = $"D:\\skinsSet\\images\\{randomSkin.ImageId}.png";
         await using var stream = File.OpenRead(path);
@@ -54,6 +55,14 @@ class Program
             caption:$"You have received:\n" +
                     $"{randomSkin.Rarity}\n" +
                     $"{randomSkin.Name}\n"+
-                    $"Quality:{randomSkin.Exterior}\n");
+                    $"Quality:{randomSkin.Exterior}\n" +
+                    $"Price is ${ExtractFirstPriceNumber(PriceFetcher.GetPrice($"{randomSkin.Name}").Result) / 100}\n\n");
+    }
+    public static double? ExtractFirstPriceNumber(string text)
+    {
+        var match = Regex.Match(text, @"""price"":(\d+)", RegexOptions.IgnoreCase);
+        if (match.Success && double.TryParse(match.Groups[1].Value, out double price))
+            return price;
+        return null; 
     }
 }
