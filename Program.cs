@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Net.NetworkInformation;
+using System.Text;
+using System.Text.RegularExpressions;
 using Telegram.Bot.Polling;
 using TgCaseBot.Classes;
 
@@ -71,24 +73,26 @@ class Program
                 replyMarkup: new ReplyKeyboardMarkup(new[]
                 {
                     new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score" }
+                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
                 })
                 {
                     ResizeKeyboard = true
                 });        
+            return;
         }
         
         if (msg.Text is null || 
             (!msg.Text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) && 
-             !msg.Text.StartsWith("Open🗝️", StringComparison.OrdinalIgnoreCase) && 
+             !msg.Text.StartsWith("Open", StringComparison.OrdinalIgnoreCase) && 
              !msg.Text.StartsWith("Check balance", StringComparison.OrdinalIgnoreCase) && 
+             !msg.Text.StartsWith("Leaderboard", StringComparison.OrdinalIgnoreCase) && 
              !msg.Text.StartsWith("Reset score", StringComparison.OrdinalIgnoreCase)))
         {
             await Bot.SendMessage(msg.Chat.Id, "че",
                 replyMarkup: new ReplyKeyboardMarkup(new[]
                 {
                     new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score" }
+                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
                 })
                 {
                     ResizeKeyboard = true
@@ -100,21 +104,22 @@ class Program
         
         var userId = $"{msg.From.Username}";
 
-        if (msg.Text.Equals("Reset score", StringComparison.OrdinalIgnoreCase))
+        switch (msg.Text)
         {
-            await DbClearUserEntry(userId, msg.Chat.Id, ct);
-            return;
+            case "Check balance":
+                await DbGetUserDetails(userId, msg.Chat.Id, ct);
+                return;
+            case "Reset score":
+                await DbClearUserEntry(userId, msg.Chat.Id, ct);
+                return;
+            case "Leaderboard📊":
+                await DbGetLeaderboard(msg.Chat.Id, ct);
+                return;
+            default:
+                await GetSkin(msg.Chat.Id, userId);
+                break;
         }
-        
-        if (msg.Text.Equals("Check balance", StringComparison.OrdinalIgnoreCase))
-        {
-            await DbGetUserDetails(userId, msg.Chat.Id, ct);
-            return;
-        }
-        
-        await GetSkin(msg.Chat.Id, userId);
     }
-
     private static async Task GetSkin(long msgChatId, string userId)
     {
         var rng = new Random();
@@ -140,7 +145,7 @@ class Program
             replyMarkup: new ReplyKeyboardMarkup(new[]
             {
                 new KeyboardButton[] { "Open🗝️", "Check balance" },
-                new KeyboardButton[] { "Reset score" }
+                new KeyboardButton[] { "Reset score", "Leaderboard📊" }
             })
             {
                 ResizeKeyboard = true
@@ -195,7 +200,7 @@ class Program
                 replyMarkup: new ReplyKeyboardMarkup(new[]
                 {
                     new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score" }
+                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
                 })
                 {
                     ResizeKeyboard = true
@@ -207,12 +212,49 @@ class Program
                 replyMarkup: new ReplyKeyboardMarkup(new[]
                 {
                     new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score" }
+                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
                 })
                 {
                     ResizeKeyboard = true
                 }, cancellationToken: ct);
         }
         Console.WriteLine($"User {userId}'s details have been displayed\n");
+    }
+
+    static async Task DbGetLeaderboard(long msgChatId, CancellationToken ct)
+    {
+        var server = muxer.GetServer("127.0.0.1:6379");
+        var keys = server.Keys(pattern: "*");
+
+        var leaderboardData = new List<(string Username, double Balance, long CasesOpened)>();
+
+        foreach (var key in keys)
+        {
+            var hash = await db.HashGetAllAsync(key);
+
+            var balanceValue = hash.FirstOrDefault(f => f.Name == "balance").Value;
+            var casesValue = hash.FirstOrDefault(f => f.Name == "cases_opened").Value;
+
+            double balance = balanceValue.HasValue ? (double)balanceValue : 0;
+            long cases = casesValue.HasValue ? (long)casesValue : 0;
+
+            leaderboardData.Add((key.ToString(), balance, cases));
+        }
+
+        var topUsers = leaderboardData
+            .OrderByDescending(x => x.Balance)
+            .Take(10);
+
+        StringBuilder leaderboard = new StringBuilder();
+        leaderboard.AppendLine("The leaderboard📊:\n");
+
+        foreach (var user in topUsers)
+        {
+            leaderboard.AppendLine(
+                $"{user.Username} | Balance: {user.Balance} | Cases Opened: {user.CasesOpened}"
+            );
+        }
+
+        await Bot.SendMessage(msgChatId, leaderboard.ToString(), cancellationToken: ct);
     }
 }
