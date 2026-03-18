@@ -23,12 +23,15 @@ class Program
         .ToList();
     static async Task Main(string[] args)
     {
-        using var cts = new CancellationTokenSource();
-        
-        Bot.OnMessage += OnMessage;
-        
+        // using var cts = new CancellationTokenSource();
+        //
+        // Bot.OnMessage += OnMessage;
+        //
+        // Console.ReadLine();
+        // await cts.CancelAsync(); 
+
+        Console.WriteLine(PriceFetcher.GetPrice("Souvenir AUG | Storm (Field-Tested)").Result);
         Console.ReadLine();
-        await cts.CancelAsync(); 
     }
     static async Task OnMessage(Message msg, UpdateType type)
     {
