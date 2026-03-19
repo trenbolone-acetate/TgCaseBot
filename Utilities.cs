@@ -25,4 +25,27 @@ public static class Utilities
             _ => "white"
         };
     }
+    public static string GetChances()
+    {
+        var random = new Random();
+        switch (random.Next(1, 273))
+        {
+            case <= 79:
+                return "Consumer Grade";
+            case <= 139:
+                return "Industrial Grade";
+            case <= 240:
+                return "Mil-Spec";
+            case <= 258:
+                return "Restricted";
+            case <= 263:
+                return "Classified";
+            case <= 270:
+                return "Covert";
+            case <= 272:
+                return "Contraband";
+            default:
+                return "Unknown";
+        }
+    }
 }

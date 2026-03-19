@@ -122,8 +122,12 @@ class Program
     }
     private static async Task GetSkin(long msgChatId, string userId)
     {
-        var rng = new Random();
-        Skin? randomSkin = _skins[rng.Next(_skins.Count)];
+        var rarity = Utilities.GetChances();
+        var group = _skins.FirstOrDefault(s => s.Rarity == rarity);
+        
+        var skinsOfRarity = _skins.Where(s => s.Rarity == rarity).ToList();
+
+        var randomSkin = skinsOfRarity[Random.Shared.Next(skinsOfRarity.Count)];
         double price = (double)(Utilities.ExtractFirstPriceNumber(PriceFetcher.GetPrice($"{randomSkin.Name}").Result) / 100);
         
         Console.WriteLine($"User {userId} received:\n " +
