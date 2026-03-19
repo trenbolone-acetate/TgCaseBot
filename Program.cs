@@ -6,6 +6,7 @@ using TgCaseBot.Classes;
 
 using NRedisStack;
 using NRedisStack.RedisStackCommands;
+using Renci.SshNet.Sftp;
 using StackExchange.Redis;
 
 namespace TgCaseBot;
@@ -14,6 +15,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 using System.Text.Json;
 using System.IO;
+using Renci.SshNet;
 
 class Program
 {
@@ -29,6 +31,7 @@ class Program
     private static readonly TelegramBotClient Bot = new TelegramBotClient(File.ReadAllText("../../../tkn.txt"));
     
     private static readonly string[] Lines = File.ReadAllLines("skins.jsonl");
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true
@@ -37,6 +40,9 @@ class Program
     private static List<Skin?> _skins = Lines
         .Select(line => JsonSerializer.Deserialize<Skin>(line,Options))
         .ToList();
+    
+    //sftp connection
+    private static SftpClient sftp;
     
     //dict for grouping skins by rarity
     private static Dictionary<string, List<Skin?>> _skinsByRarity;
@@ -48,6 +54,11 @@ class Program
     
     static async Task Main(string[] args)
     {
+        Console.WriteLine("Bot is alive...");
+        
+        await InitializeSftpConnection();
+        
+        await GetJson();
         _skinsByRarity = _skins
             .GroupBy(s => s.Rarity)
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -117,13 +128,18 @@ class Program
                 break;
 
             default:
-                if (IsOnCooldown(userId))
+                if (!IsOnCooldown(userId))
                 {
-                    if (text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) 
-                        || text.StartsWith("Open",StringComparison.OrdinalIgnoreCase))
+                    if (text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) ||
+                        text.StartsWith("Open",StringComparison.OrdinalIgnoreCase))
                         await GetSkin(msg.Chat.Id, userId);
                     else
                         await SendDefault(msg.Chat.Id, ct);
+                }
+                else
+                {
+                        var elapsed = DateTime.UtcNow - userCooldowns.Last(u => u.Key == userId).Value;
+                        await Bot.SendMessage(msg.Chat.Id, $"⏱️ Wait {Math.Ceiling((cooldown - elapsed).TotalSeconds)} seconds before opening a new case.", cancellationToken: ct);
                 }
                 break;
         }
@@ -156,22 +172,10 @@ class Program
     }
     private static async Task SendSkin(long msgChatId, string userId, Skin randomSkin, double? price)
     {
-        var path = $@"D:\skinsSet\imagesWebP\{randomSkin.ImageId}.webp";
-        await using var stream = File.OpenRead(path);
-
-        try
-        {
-            await Bot.SendDocument(msgChatId,
-                document: InputFile.FromStream(stream, $"{randomSkin.ImageId}.webp"));
-        }
-        //fallback for cases when the image is not found
-        catch (Exception e)
-        {
-            await Bot.SendDocument(msgChatId,
-                document: InputFile.FromStream(stream, $"eyes.webp"));
-            Console.WriteLine(e);
-            throw;
-        }
+        // var path = $@"D:\skinsSet\imagesWebP\{randomSkin.ImageId}.webp";
+        // await using var stream = File.OpenRead(path);
+        await SendImage(msgChatId, randomSkin.ImageId);
+        
         await Bot.SendMessage(msgChatId,
             text:$"🎉 @{userId} has received:\n" + 
                  $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" + 
@@ -302,4 +306,57 @@ class Program
         {
             ResizeKeyboard = true
         };
+
+    private static async Task InitializeSftpConnection()
+    {
+        const string host = "172.19.158.11"; 
+        const string username = "armanus";
+        var password = await File.ReadAllTextAsync("../../../sshPwd.txt");
+
+        sftp = new SftpClient(host, username, password);
+        sftp.Connect();
+    }
+    private static async Task GetJson()
+    {
+        using (var stream = new MemoryStream())
+        {
+            sftp.DownloadFile("/home/armanus/TgBotFiles/output.jsonl", stream);
+            stream.Position = 0;
+            using (var reader = new StreamReader(stream))
+            {
+                (await reader.ReadToEndAsync()).Split('\n');
+            }
+        }
+    
+        sftp.Disconnect();
+    }
+    private static async Task SendImage(long msgChatId, string pictureNumber)
+    {
+        if (!sftp.IsConnected)
+            sftp.Connect();
+
+        try
+        {
+            using var stream = new MemoryStream();
+            await sftp.DownloadFileAsync($"/home/armanus/TgBotFiles/imagesWebP/{pictureNumber}.webp", stream);
+
+            stream.Position = 0;
+
+            await Bot.SendDocument(msgChatId,
+                document: InputFile.FromStream(stream, $"{pictureNumber}.webp"));
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+
+            using var fallbackStream = new MemoryStream();
+            await sftp.DownloadFileAsync("/home/armanus/TgBotFiles/imagesWebP/eyes.webp", fallbackStream);
+
+            fallbackStream.Position = 0;
+
+            await Bot.SendDocument(msgChatId,
+                document: InputFile.FromStream(fallbackStream, "eyes.webp"));
+        }
+    }
+    
 }
