@@ -141,16 +141,17 @@ class Program
     }
     private static async Task SendSkin(long msgChatId, Skin randomSkin, double? price)
     {
-        var path = $"D:\\skinsSet\\images\\{randomSkin.ImageId}.png";
+        var path = $"D:\\skinsSet\\imagesWebP\\{randomSkin.ImageId}.webp";
         await using var stream = File.OpenRead(path);
-        
-        await Bot.SendPhoto(msgChatId, 
-            photo: InputFile.FromStream(stream, $"{randomSkin.ImageId}.png"), 
-            caption:$"🎉 You have received:\n" +
-                    $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" +
-                    $"👉 {randomSkin.Name}\n"+
-                    $"🛠 Quality:{randomSkin.Exterior}\n" +
-                    $"💵 ${price}\n\n",
+
+        await Bot.SendDocument(msgChatId,
+            document: InputFile.FromStream(stream, $"{randomSkin.ImageId}.webp"));
+        await Bot.SendMessage(msgChatId,
+            text:$"🎉 You have received:\n" + 
+                 $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" + 
+                 $"👉 {randomSkin.Name}\n"+ 
+                 $"🛠 Quality:{randomSkin.Exterior}\n" + 
+                 $"💵 ${price}\n\n",
             replyMarkup: GetKeyboard());
     }
     static async Task DbAddEntry(string userId, double? price)
