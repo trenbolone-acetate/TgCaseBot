@@ -43,7 +43,7 @@ class Program
     
     //timer for cooldown
     private static Dictionary<string, DateTime> userCooldowns = new();
-    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(30);
     
     
     static async Task Main(string[] args)
@@ -76,25 +76,13 @@ class Program
     {
         if (update.Message is not { } msg)
             return;
+
         if (msg.Date < DateTime.UtcNow.AddSeconds(-5))
             return;
-        
-        var user = update.Message?.From.Username ?? update.CallbackQuery?.From.Username;
-        if (user == null) return;
 
-        if (userCooldowns.TryGetValue(user, out var lastTime))
-        {
-            var elapsed = DateTime.UtcNow - lastTime;
-            if (elapsed < cooldown)
-            {
-                await Bot.SendMessage(msg.Chat.Id,
-                    $"Please wait {Math.Ceiling((cooldown - elapsed).TotalSeconds)} seconds to use the bot again.", cancellationToken: ct);
-                return;
-            }
-        }
-        
-        userCooldowns[user] = DateTime.UtcNow;
-        
+        var userId = msg.From?.Id;
+        if (userId == null) return;
+
         var text = msg.Text;
         if (text == null)
         {
@@ -129,10 +117,14 @@ class Program
                 break;
 
             default:
-                if (text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) || text.StartsWith("Open",StringComparison.OrdinalIgnoreCase))
-                    await GetSkin(msg.Chat.Id, userId);
-                else
-                    await SendDefault(msg.Chat.Id, ct);
+                if (IsOnCooldown(userId))
+                {
+                    if (text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) 
+                        || text.StartsWith("Open",StringComparison.OrdinalIgnoreCase))
+                        await GetSkin(msg.Chat.Id, userId);
+                    else
+                        await SendDefault(msg.Chat.Id, ct);
+                }
                 break;
         }
     }
@@ -164,7 +156,7 @@ class Program
     }
     private static async Task SendSkin(long msgChatId, string userId, Skin randomSkin, double? price)
     {
-        var path = $"D:\\skinsSet\\imagesWebP\\{randomSkin.ImageId}.webp";
+        var path = $@"D:\skinsSet\imagesWebP\{randomSkin.ImageId}.webp";
         await using var stream = File.OpenRead(path);
 
         try
@@ -181,7 +173,7 @@ class Program
             throw;
         }
         await Bot.SendMessage(msgChatId,
-            text:$"🎉 @{userId} have received:\n" + 
+            text:$"🎉 @{userId} has received:\n" + 
                  $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" + 
                  $"👉 {randomSkin.Name}\n"+ 
                  $"🛠 Quality:{randomSkin.Exterior}\n" + 
@@ -289,6 +281,18 @@ class Program
         }
 
         await Bot.SendMessage(msgChatId, leaderboard.ToString(), cancellationToken: ct);
+    }
+    private static bool IsOnCooldown(string username)
+    {
+        if (userCooldowns.TryGetValue(username, out var lastTime))
+        {
+            var elapsed = DateTime.UtcNow - lastTime;
+            if (elapsed < cooldown)
+                return true;
+        }
+
+        userCooldowns[username] = DateTime.UtcNow;
+        return false;
     }
     private static ReplyKeyboardMarkup GetKeyboard() => new(new[]
         {
