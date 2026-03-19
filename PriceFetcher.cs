@@ -12,7 +12,7 @@ public static class PriceFetcher
   
   client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_floatToken);
 
-  string url = $"https://csfloat.com/api/v1/listings?limit=1&market_hash_name={Uri.EscapeDataString(skinName)}&sort_by=lowest_price";
+  string url = $"https://csfloat.com/api/v1/listings?limit=1&market_hash_name={Uri.EscapeDataString(skinName)}&sort_by=lowest_price&type=buy_now";
 
   var response = await client.GetAsync(url);
   response.EnsureSuccessStatusCode();

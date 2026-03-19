@@ -17,27 +17,34 @@ using System.IO;
 
 class Program
 {
-    private static readonly TelegramBotClient Bot = new TelegramBotClient(File.ReadAllText("../../../tkn.txt"));
-    
-    private static readonly string[] Lines = File.ReadAllLines("skins.jsonl");
-
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-    private static List<Skin?> _skins = Lines
-        .Select(line => JsonSerializer.Deserialize<Skin>(line,Options))
-        .ToList();
-
-    private static Dictionary<string, List<Skin?>> _skinsByRarity;
-
+    //db coonection
     private static readonly ConnectionMultiplexer muxer = ConnectionMultiplexer.Connect(
         new ConfigurationOptions{
             EndPoints= { "127.0.0.1:6379"}
         }
     );
-
     private static readonly IDatabase db = muxer.GetDatabase();
+    
+    //tg bot
+    private static readonly TelegramBotClient Bot = new TelegramBotClient(File.ReadAllText("../../../tkn.txt"));
+    
+    private static readonly string[] Lines = File.ReadAllLines("skins.jsonl");
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+    //deserializing skins
+    private static List<Skin?> _skins = Lines
+        .Select(line => JsonSerializer.Deserialize<Skin>(line,Options))
+        .ToList();
+    
+    //dict for grouping skins by rarity
+    private static Dictionary<string, List<Skin?>> _skinsByRarity;
+    
+    //timer for cooldown
+    private static Dictionary<string, DateTime> userCooldowns = new();
+    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(3);
+    
     
     static async Task Main(string[] args)
     {
@@ -71,6 +78,22 @@ class Program
             return;
         if (msg.Date < DateTime.UtcNow.AddSeconds(-5))
             return;
+        
+        var user = update.Message?.From.Username ?? update.CallbackQuery?.From.Username;
+        if (user == null) return;
+
+        if (userCooldowns.TryGetValue(user, out var lastTime))
+        {
+            var elapsed = DateTime.UtcNow - lastTime;
+            if (elapsed < cooldown)
+            {
+                await Bot.SendMessage(msg.Chat.Id,
+                    $"Please wait {Math.Ceiling((cooldown - elapsed).TotalSeconds)} seconds to use the bot again.", cancellationToken: ct);
+                return;
+            }
+        }
+        
+        userCooldowns[user] = DateTime.UtcNow;
         
         var text = msg.Text;
         if (text == null)
@@ -144,8 +167,19 @@ class Program
         var path = $"D:\\skinsSet\\imagesWebP\\{randomSkin.ImageId}.webp";
         await using var stream = File.OpenRead(path);
 
-        await Bot.SendDocument(msgChatId,
-            document: InputFile.FromStream(stream, $"{randomSkin.ImageId}.webp"));
+        try
+        {
+            await Bot.SendDocument(msgChatId,
+                document: InputFile.FromStream(stream, $"{randomSkin.ImageId}.webp"));
+        }
+        //fallback for cases when the image is not found
+        catch (Exception e)
+        {
+            await Bot.SendDocument(msgChatId,
+                document: InputFile.FromStream(stream, $"eyes.webp"));
+            Console.WriteLine(e);
+            throw;
+        }
         await Bot.SendMessage(msgChatId,
             text:$"🎉 You have received:\n" + 
                  $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" + 
