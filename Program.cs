@@ -21,26 +21,33 @@ class Program
     
     private static readonly string[] Lines = File.ReadAllLines("skins.jsonl");
 
-    private static readonly JsonSerializerOptions options = new()
+    private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true
     };
     private static List<Skin?> _skins = Lines
-        .Select(line => JsonSerializer.Deserialize<Skin>(line,options))
+        .Select(line => JsonSerializer.Deserialize<Skin>(line,Options))
         .ToList();
 
-    static ConnectionMultiplexer muxer = ConnectionMultiplexer.Connect(
+    private static Dictionary<string, List<Skin?>> _skinsByRarity;
+
+    private static readonly ConnectionMultiplexer muxer = ConnectionMultiplexer.Connect(
         new ConfigurationOptions{
             EndPoints= { "127.0.0.1:6379"}
         }
     );
-    static IDatabase db = muxer.GetDatabase();
+
+    private static readonly IDatabase db = muxer.GetDatabase();
         
     
     
     
     static async Task Main(string[] args)
     {
+        _skinsByRarity = _skins
+            .GroupBy(s => s.Rarity)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        
         using var cts = new CancellationTokenSource();
         
         Bot.StartReceiving(
@@ -57,6 +64,8 @@ class Program
 
     private static Task HandleErrorAsync(ITelegramBotClient arg1, Exception arg2, HandleErrorSource arg3, CancellationToken arg4)
     {
+        Console.WriteLine(arg2);
+        Console.WriteLine(arg3);
         throw new NotImplementedException();
     }
 
@@ -123,12 +132,13 @@ class Program
     private static async Task GetSkin(long msgChatId, string userId)
     {
         var rarity = Utilities.GetChances();
-        var group = _skins.FirstOrDefault(s => s.Rarity == rarity);
+        var skinsOfRarity = _skinsByRarity[rarity];
         
-        var skinsOfRarity = _skins.Where(s => s.Rarity == rarity).ToList();
-
         var randomSkin = skinsOfRarity[Random.Shared.Next(skinsOfRarity.Count)];
-        double price = (double)(Utilities.ExtractFirstPriceNumber(PriceFetcher.GetPrice($"{randomSkin.Name}").Result) / 100);
+        double price = (double)(
+            Utilities.ExtractFirstPriceNumber(
+                await PriceFetcher.GetPrice($"{randomSkin.Name}")) 
+            / 100);
         
         Console.WriteLine($"User {userId} received:\n " +
                           $"{randomSkin.Rarity}\n " +
@@ -169,13 +179,14 @@ class Program
         }
         else
         {
-            await db.HashIncrementAsync(userId, "cases_opened", 1);
+            await db.HashIncrementAsync(userId, "cases_opened");
             await db.HashIncrementAsync(userId, "balance", price);
         }
 
         Console.WriteLine($"User {userId} has been updated with {price} to their balance\n");
     }
-    static async Task DbClearUserEntry(string userId, long msgChatId, CancellationToken ct)
+
+    private static async Task DbClearUserEntry(string userId, long msgChatId, CancellationToken ct)
     {
         if (!await db.KeyExistsAsync(userId))
         {
