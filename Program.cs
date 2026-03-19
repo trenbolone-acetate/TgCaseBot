@@ -43,7 +43,7 @@ class Program
     
     //timer for cooldown
     private static Dictionary<string, DateTime> userCooldowns = new();
-    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(60);
     
     
     static async Task Main(string[] args)
@@ -152,7 +152,7 @@ class Program
                           $"Quality:{randomSkin.Exterior}\n" +
                           $"Price is ${price}\n");
 
-        await SendSkin(msgChatId, randomSkin, price);
+        await SendSkin(msgChatId, userId, randomSkin, price);
         
         await DbAddEntry(userId, price);
     }
@@ -162,7 +162,7 @@ class Program
         var skins = _skinsByRarity[rarity];
         return skins[Random.Shared.Next(skins.Count)];
     }
-    private static async Task SendSkin(long msgChatId, Skin randomSkin, double? price)
+    private static async Task SendSkin(long msgChatId, string userId, Skin randomSkin, double? price)
     {
         var path = $"D:\\skinsSet\\imagesWebP\\{randomSkin.ImageId}.webp";
         await using var stream = File.OpenRead(path);
@@ -181,7 +181,7 @@ class Program
             throw;
         }
         await Bot.SendMessage(msgChatId,
-            text:$"🎉 You have received:\n" + 
+            text:$"🎉 @{userId} have received:\n" + 
                  $"{Utilities.GetRarityColor(randomSkin.Rarity)} {randomSkin.Rarity}\n" + 
                  $"👉 {randomSkin.Name}\n"+ 
                  $"🛠 Quality:{randomSkin.Exterior}\n" + 
@@ -230,7 +230,7 @@ class Program
         {
             var balance = (double)db.HashGet(userId, "balance");
             var casesOpened = (double)db.HashGet(userId, "cases_opened");
-            await Bot.SendMessage(msgChatId, $"💰Your balance is: ${balance:F2}\n📦You have opened {casesOpened} cases!",
+            await Bot.SendMessage(msgChatId, $"💰@{userId} balance is: ${balance:F2}\n📦You have opened {casesOpened} cases!",
                 replyMarkup: new ReplyKeyboardMarkup(new[]
                 {
                     new KeyboardButton[] { "Open🗝️", "Check balance" },
