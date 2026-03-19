@@ -38,9 +38,6 @@ class Program
     );
 
     private static readonly IDatabase db = muxer.GetDatabase();
-        
-    
-    
     
     static async Task Main(string[] args)
     {
@@ -68,84 +65,82 @@ class Program
         Console.WriteLine(arg3);
         throw new NotImplementedException();
     }
-
-    static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
+    private static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
         if (update.Message is not { } msg)
             return;
         if (msg.Date < DateTime.UtcNow.AddSeconds(-5))
             return;
         
-        if (msg.Text != null && msg.Text.Equals("/start", StringComparison.OrdinalIgnoreCase))
+        var text = msg.Text;
+        if (text == null)
         {
-            await Bot.SendMessage(msg.Chat.Id, "бутылка", cancellationToken: ct, 
-                replyMarkup: new ReplyKeyboardMarkup(new[]
-                {
-                    new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
-                })
-                {
-                    ResizeKeyboard = true
-                });        
+            await SendDefault(msg.Chat.Id, ct);
             return;
         }
-        
-        if (msg.Text is null || 
-            (!msg.Text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) && 
-             !msg.Text.StartsWith("Open", StringComparison.OrdinalIgnoreCase) && 
-             !msg.Text.StartsWith("Check balance", StringComparison.OrdinalIgnoreCase) && 
-             !msg.Text.StartsWith("Leaderboard", StringComparison.OrdinalIgnoreCase) && 
-             !msg.Text.StartsWith("Reset score", StringComparison.OrdinalIgnoreCase)))
-        {
-            await Bot.SendMessage(msg.Chat.Id, "че",
-                replyMarkup: new ReplyKeyboardMarkup(new[]
-                {
-                    new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
-                })
-                {
-                    ResizeKeyboard = true
-                },
-                cancellationToken: ct
-            );
-            return;
-        }
-        
-        var userId = $"{msg.From.Username}";
 
-        switch (msg.Text)
+        await RouteCommand(msg, text, ct);
+    }
+    private static Task SendDefault(long chatId, CancellationToken ct) =>
+        Bot.SendMessage(chatId, "че", replyMarkup: GetKeyboard(), cancellationToken: ct);
+    private static async Task RouteCommand(Message msg, string text, CancellationToken ct)
+    {
+        var userId = msg.From.Username;
+
+        switch (text)
         {
+            case "/start":
+                await SendStart(msg.Chat.Id, ct);
+                break;
+
             case "Check balance":
                 await DbGetUserDetails(userId, msg.Chat.Id, ct);
-                return;
+                break;
+
             case "Reset score":
                 await DbClearUserEntry(userId, msg.Chat.Id, ct);
-                return;
+                break;
+
             case "Leaderboard📊":
                 await DbGetLeaderboard(msg.Chat.Id, ct);
-                return;
+                break;
+
             default:
-                await GetSkin(msg.Chat.Id, userId);
+                if (text.StartsWith("/case", StringComparison.OrdinalIgnoreCase) || text.StartsWith("Open",StringComparison.OrdinalIgnoreCase))
+                    await GetSkin(msg.Chat.Id, userId);
+                else
+                    await SendDefault(msg.Chat.Id, ct);
                 break;
         }
     }
+    private static Task SendStart(long chatId, CancellationToken ct) =>
+        Bot.SendMessage(chatId, "дарова", replyMarkup: GetKeyboard(), cancellationToken: ct);
     private static async Task GetSkin(long msgChatId, string userId)
     {
-        var rarity = Utilities.GetChances();
-        var skinsOfRarity = _skinsByRarity[rarity];
+        var randomSkin = RollSkin();
         
-        var randomSkin = skinsOfRarity[Random.Shared.Next(skinsOfRarity.Count)];
-        double price = (double)(
-            Utilities.ExtractFirstPriceNumber(
-                await PriceFetcher.GetPrice($"{randomSkin.Name}")) 
-            / 100);
+        double? price = Utilities.ExtractFirstPriceNumber(
+                            await PriceFetcher.GetPrice($"{randomSkin.Name}")) 
+                        / 100;
         
         Console.WriteLine($"User {userId} received:\n " +
                           $"{randomSkin.Rarity}\n " +
                           $"{randomSkin.Name}\n" +
                           $"Quality:{randomSkin.Exterior}\n" +
-                          $"Price is ${price}\n\n");
+                          $"Price is ${price}\n");
 
+        await SendSkin(msgChatId, randomSkin, price);
+        
+        await DbAddEntry(userId, price);
+    }
+    private static Skin? RollSkin()
+    {
+        var rarity = Utilities.GetChances();
+        var skins = _skinsByRarity[rarity];
+        return skins[Random.Shared.Next(skins.Count)];
+    }
+    private static async Task SendSkin(long msgChatId, Skin randomSkin, double? price)
+    {
         var path = $"D:\\skinsSet\\images\\{randomSkin.ImageId}.png";
         await using var stream = File.OpenRead(path);
         
@@ -156,19 +151,9 @@ class Program
                     $"👉 {randomSkin.Name}\n"+
                     $"🛠 Quality:{randomSkin.Exterior}\n" +
                     $"💵 ${price}\n\n",
-            replyMarkup: new ReplyKeyboardMarkup(new[]
-            {
-                new KeyboardButton[] { "Open🗝️", "Check balance" },
-                new KeyboardButton[] { "Reset score", "Leaderboard📊" }
-            })
-            {
-                ResizeKeyboard = true
-            });
-        
-        await DbAddEntry(userId, price);
+            replyMarkup: GetKeyboard());
     }
-
-    static async Task DbAddEntry(string userId, double price)
+    static async Task DbAddEntry(string userId, double? price)
     {
         if (!await db.KeyExistsAsync(userId))
         {
@@ -180,12 +165,11 @@ class Program
         else
         {
             await db.HashIncrementAsync(userId, "cases_opened");
-            await db.HashIncrementAsync(userId, "balance", price);
+            await db.HashIncrementAsync(userId, "balance", price ?? 0.00);
         }
 
         Console.WriteLine($"User {userId} has been updated with {price} to their balance\n");
     }
-
     private static async Task DbClearUserEntry(string userId, long msgChatId, CancellationToken ct)
     {
         if (!await db.KeyExistsAsync(userId))
@@ -205,7 +189,7 @@ class Program
         await Bot.SendMessage(msgChatId, "Your stats have been reset", cancellationToken: ct);
         Console.WriteLine($"User {userId} has been reset\n");
     }
-    static async Task DbGetUserDetails(string userId, long msgChatId, CancellationToken ct)
+    private static async Task DbGetUserDetails(string userId, long msgChatId, CancellationToken ct)
     {
         if (await db.KeyExistsAsync(userId))
         {
@@ -235,8 +219,7 @@ class Program
         }
         Console.WriteLine($"User {userId}'s details have been displayed\n");
     }
-
-    static async Task DbGetLeaderboard(long msgChatId, CancellationToken ct)
+    private static async Task DbGetLeaderboard(long msgChatId, CancellationToken ct)
     {
         var server = muxer.GetServer("127.0.0.1:6379");
         var keys = server.Keys(pattern: "*");
@@ -266,10 +249,18 @@ class Program
         foreach (var user in topUsers)
         {
             leaderboard.AppendLine(
-                $"{user.Username} | Balance: {user.Balance} | Cases Opened: {user.CasesOpened}"
+                $"{user.Username} | Balance: {user.Balance:F2} | Cases Opened: {user.CasesOpened}"
             );
         }
 
         await Bot.SendMessage(msgChatId, leaderboard.ToString(), cancellationToken: ct);
     }
+    private static ReplyKeyboardMarkup GetKeyboard() => new(new[]
+        {
+            new KeyboardButton[] { "Open🗝️", "Check balance" },
+            new KeyboardButton[] { "Reset score", "Leaderboard📊" }
+        })
+        {
+            ResizeKeyboard = true
+        };
 }
