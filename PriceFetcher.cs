@@ -3,11 +3,13 @@
 namespace TgCaseBot;
 using System.Net.Http;
 using System.Threading.Tasks;
+using static GlobalVars;
+
 
 public static class PriceFetcher
 {
- private static HttpClient client = new();
- private static readonly string _floatToken = File.ReadAllText("../../../csfloatToken.txt").Trim();
+ private static readonly HttpClient client = new();
+ private static readonly string _floatToken = File.ReadAllText("/home/armanus/csfloatToken.txt").Trim();
  public static async Task<string> GetPrice(string skinName) {
   
   client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_floatToken);

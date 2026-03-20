@@ -16,42 +16,10 @@ using Telegram.Bot.Types.ReplyMarkups;
 using System.Text.Json;
 using System.IO;
 using Renci.SshNet;
+using static GlobalVars;
 
 class Program
 {
-    //db coonection
-    private static readonly ConnectionMultiplexer muxer = ConnectionMultiplexer.Connect(
-        new ConfigurationOptions{
-            EndPoints= { "127.0.0.1:6379"}
-        }
-    );
-    private static readonly IDatabase db = muxer.GetDatabase();
-    
-    //tg bot
-    private static readonly TelegramBotClient Bot = new TelegramBotClient(File.ReadAllText("../../../tkn.txt"));
-    
-    private static readonly string[] Lines = File.ReadAllLines("skins.jsonl");
-
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-    //deserializing skins
-    private static List<Skin?> _skins = Lines
-        .Select(line => JsonSerializer.Deserialize<Skin>(line,Options))
-        .ToList();
-    
-    //sftp connection
-    private static SftpClient sftp;
-    
-    //dict for grouping skins by rarity
-    private static Dictionary<string, List<Skin?>> _skinsByRarity;
-    
-    //timer for cooldown
-    private static Dictionary<string, DateTime> userCooldowns = new();
-    private static readonly TimeSpan cooldown = TimeSpan.FromSeconds(30);
-    
-    
     static async Task Main(string[] args)
     {
         Console.WriteLine("Bot is alive...");
@@ -227,26 +195,12 @@ class Program
             var balance = (double)db.HashGet(userId, "balance");
             var casesOpened = (double)db.HashGet(userId, "cases_opened");
             await Bot.SendMessage(msgChatId, $"💰@{userId} balance is: ${balance:F2}\n📦You have opened {casesOpened} cases!",
-                replyMarkup: new ReplyKeyboardMarkup(new[]
-                {
-                    new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
-                })
-                {
-                    ResizeKeyboard = true
-                }, cancellationToken: ct);
+                replyMarkup: GetKeyboard(), cancellationToken: ct);
         }
         else
         {
             await Bot.SendMessage(msgChatId, $"💰Your balance is: $0",
-                replyMarkup: new ReplyKeyboardMarkup(new[]
-                {
-                    new KeyboardButton[] { "Open🗝️", "Check balance" },
-                    new KeyboardButton[] { "Reset score", "Leaderboard📊" }
-                })
-                {
-                    ResizeKeyboard = true
-                }, cancellationToken: ct);
+                replyMarkup: GetKeyboard(), cancellationToken: ct);
         }
         Console.WriteLine($"User {userId}'s details have been displayed\n");
     }
@@ -266,7 +220,7 @@ class Program
 
             double balance = balanceValue.HasValue ? (double)balanceValue : 0;
             long cases = casesValue.HasValue ? (long)casesValue : 0;
-
+            
             leaderboardData.Add((key.ToString(), balance, cases));
         }
 
@@ -309,10 +263,6 @@ class Program
 
     private static async Task InitializeSftpConnection()
     {
-        const string host = "172.19.158.11"; 
-        const string username = "armanus";
-        var password = await File.ReadAllTextAsync("../../../sshPwd.txt");
-
         sftp = new SftpClient(host, username, password);
         sftp.Connect();
     }
@@ -320,7 +270,7 @@ class Program
     {
         using (var stream = new MemoryStream())
         {
-            sftp.DownloadFile("/home/armanus/TgBotFiles/output.jsonl", stream);
+            sftp.DownloadFile("/home/armanus/TgBotFiles/skins.jsonl", stream);
             stream.Position = 0;
             using (var reader = new StreamReader(stream))
             {
