@@ -8,15 +8,21 @@ using static GlobalVars;
 
 public static class PriceFetcher
 {
- private static readonly HttpClient client = new();
- private static readonly string _floatToken = File.ReadAllText("/home/armanus/csfloatToken.txt").Trim();
- public static async Task<string> GetPrice(string skinName) {
+ private static readonly HttpClient steamWebClient = new();
+ public static async Task<string> GetSteamPrice(string skinName) {
+
+  if (skinName.StartsWith("Souvenir "))
+  {
+   skinName = skinName.Remove(0, 9);
+  }
+  var vanillaIndex = skinName.IndexOf(" | Vanilla", StringComparison.Ordinal);
+  if (vanillaIndex >= 0)
+   skinName = skinName.Substring(0, vanillaIndex);
   
-  client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_floatToken);
-
-  string url = $"https://csfloat.com/api/v1/listings?limit=1&market_hash_name={Uri.EscapeDataString(skinName)}&sort_by=lowest_price&type=buy_now";
-
-  var response = await client.GetAsync(url);
+  string encodedName = Uri.EscapeDataString($"{skinName}");
+  string url = $"https://steamcommunity.com/market/priceoverview/?country=US&appid=730&market_hash_name={encodedName}&currency=USD";
+  
+  var response = await steamWebClient.GetAsync(url);
   response.EnsureSuccessStatusCode();
   
   var content = await response.Content.ReadAsStringAsync();

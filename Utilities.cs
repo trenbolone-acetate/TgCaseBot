@@ -1,15 +1,32 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace TgCaseBot;
 
 public static class Utilities
 {
-    public static double? ExtractFirstPriceNumber(string text)
+    public static double? ExtractFirstPriceNumberSteam(string json)
     {
-        var match = Regex.Match(text, @"""price"":(\d+)", RegexOptions.IgnoreCase);
-        if (match.Success && double.TryParse(match.Groups[1].Value, out double price))
-            return price;
-        return null; 
+        
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("median_price", out var median) && median.GetString() != null)
+        { 
+            var medianPrice= median.GetString();
+            
+            medianPrice = medianPrice.Replace("$", "");
+            return double.Parse(medianPrice, CultureInfo.InvariantCulture);
+        }
+
+        if (root.TryGetProperty("lowest_price", out var lowest))
+        {
+            var lowestPrice= lowest.GetString();
+            lowestPrice = lowestPrice.Replace("$", "");
+            return double.Parse(lowestPrice, CultureInfo.InvariantCulture);
+        }
+        return null;
     }
     
     public static string GetRarityColor(string rarityName)

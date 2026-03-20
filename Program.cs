@@ -22,7 +22,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Bot is alive...");
+        Console.WriteLine($"{DateTime.Now}:  Bot is alive...\n");
         
         await InitializeSftpConnection();
         
@@ -118,15 +118,14 @@ class Program
     {
         var randomSkin = RollSkin();
         
-        double? price = Utilities.ExtractFirstPriceNumber(
-                            await PriceFetcher.GetPrice($"{randomSkin.Name}")) 
-                        / 100;
+        double? price = Utilities.ExtractFirstPriceNumberSteam(
+                            await PriceFetcher.GetSteamPrice($"{randomSkin.Name}"));
+        Console.WriteLine(await PriceFetcher.GetSteamPrice($"{randomSkin.Name}"));
         
-        Console.WriteLine($"User {userId} received:\n " +
-                          $"{randomSkin.Rarity}\n " +
-                          $"{randomSkin.Name}\n" +
-                          $"Quality:{randomSkin.Exterior}\n" +
-                          $"Price is ${price}\n");
+        Console.WriteLine($"{userId}:\n " +
+                          $"{randomSkin.Rarity}  -  {randomSkin.Name}\n" +
+                          $"{randomSkin.Exterior}\n" +
+                          $"${price}\n");
 
         await SendSkin(msgChatId, userId, randomSkin, price);
         
@@ -140,8 +139,6 @@ class Program
     }
     private static async Task SendSkin(long msgChatId, string userId, Skin randomSkin, double? price)
     {
-        // var path = $@"D:\skinsSet\imagesWebP\{randomSkin.ImageId}.webp";
-        // await using var stream = File.OpenRead(path);
         await SendImage(msgChatId, randomSkin.ImageId);
         
         await Bot.SendMessage(msgChatId,
@@ -167,7 +164,7 @@ class Program
             await db.HashIncrementAsync(userId, "balance", price ?? 0.00);
         }
 
-        Console.WriteLine($"User {userId} has been updated with {price} to their balance\n");
+        Console.WriteLine($"add {price} to {userId} balance\n");
     }
     private static async Task DbClearUserEntry(string userId, long msgChatId, CancellationToken ct)
     {
@@ -186,7 +183,7 @@ class Program
             ]);
         }
         await Bot.SendMessage(msgChatId, "Your stats have been reset", cancellationToken: ct);
-        Console.WriteLine($"User {userId} has been reset\n");
+        Console.WriteLine($"{userId} reset balance\n");
     }
     private static async Task DbGetUserDetails(string userId, long msgChatId, CancellationToken ct)
     {
@@ -202,7 +199,7 @@ class Program
             await Bot.SendMessage(msgChatId, $"💰Your balance is: $0",
                 replyMarkup: GetKeyboard(), cancellationToken: ct);
         }
-        Console.WriteLine($"User {userId}'s details have been displayed\n");
+        Console.WriteLine($"{userId} check balance\n");
     }
     private static async Task DbGetLeaderboard(long msgChatId, CancellationToken ct)
     {

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "Zf+irkR/ErA=",
+  "dgSpecHash": "ykrbXkYvQp9ilsZSJTHxnW23cGjMfpSNxX77j0PtNdQ/0CcKaCaYBwGiHvToTqxHhh/dM+aDewPR1ImRAuvWIw==",
   "success": true,
   "projectFilePath": "D:\\TgCaseBot\\TgCaseBot.csproj",
   "expectedPackageFiles": [
@@ -18,7 +18,10 @@
     "C:\\Users\\User-PC\\.nuget\\packages\\stackexchange.redis\\2.9.17\\stackexchange.redis.2.9.17.nupkg.sha512",
     "C:\\Users\\User-PC\\.nuget\\packages\\system.io.pipelines\\5.0.1\\system.io.pipelines.5.0.1.nupkg.sha512",
     "C:\\Users\\User-PC\\.nuget\\packages\\system.text.json\\8.0.5\\system.text.json.8.0.5.nupkg.sha512",
-    "C:\\Users\\User-PC\\.nuget\\packages\\telegram.bot\\22.9.5.3\\telegram.bot.22.9.5.3.nupkg.sha512"
+    "C:\\Users\\User-PC\\.nuget\\packages\\telegram.bot\\22.9.5.3\\telegram.bot.22.9.5.3.nupkg.sha512",
+    "C:\\Users\\User-PC\\.nuget\\packages\\microsoft.netcore.app.runtime.linux-x64\\8.0.3\\microsoft.netcore.app.runtime.linux-x64.8.0.3.nupkg.sha512",
+    "C:\\Users\\User-PC\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.linux-x64\\8.0.3\\microsoft.aspnetcore.app.runtime.linux-x64.8.0.3.nupkg.sha512",
+    "C:\\Users\\User-PC\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\8.0.3\\microsoft.netcore.app.host.linux-x64.8.0.3.nupkg.sha512"
   ],
   "logs": []
 }
